@@ -1,61 +1,67 @@
 # Sentinelle
 
-Intégration Home Assistant qui **surveille les connexions refusées** à Home Assistant et aux add-ons SSH, avec une carte Lovelace et des notifications. **Rien n'est bloqué** : Sentinelle observe et prévient.
+Home Assistant integration that **monitors rejected logins** to Home Assistant and to SSH add-ons, with a Lovelace card and phone notifications. **Nothing is blocked**: Sentinelle watches and tells you.
 
-## Ce qu'elle détecte
+## What it detects
 
-- **Home Assistant** : chaque mot de passe refusé sur la page de connexion, et chaque requête avec un jeton invalide (lus dans le journal `homeassistant.components.http.ban`).
-- **SSH** : chaque mot de passe ou clé refusé par un add-on SSH (`core_ssh`, « Advanced SSH & Web Terminal »…), lu toutes les minutes dans ses logs via le Supervisor.
-- **Attaque en cours** : au moins *N* tentatives en *X* minutes, toutes sources et toutes IP confondues (5 en 10 min par défaut).
+- **Home Assistant**: every password rejected on the login page, and every request with an invalid token (read from the `homeassistant.components.http.ban` log).
+- **SSH**: every password or key rejected by an SSH add-on (`core_ssh`, "Advanced SSH & Web Terminal"…), read from its logs through the Supervisor every minute.
+- **Attack in progress**: at least *N* attempts within *X* minutes, all sources and IPs combined (5 in 10 min by default).
 
-Chaque IP est localisée (pays, ville, FAI) via [ip-api.com](https://ip-api.com). Les IP privées sont marquées « Réseau local » et ne sont jamais envoyées. La localisation peut être désactivée.
+Each public IP is located (country, city, ISP) with [ip-api.com](https://ip-api.com). Private IPs are labelled "Local network" and are **never sent** anywhere. Geolocation can be turned off.
 
 ## Notifications
 
-- Début d'attaque, rappel toutes les 30 min tant qu'elle dure, puis fin d'attaque avec le bilan.
-- Option : une alerte à chaque mot de passe Home Assistant refusé (au plus une toutes les 10 min par IP).
+- Attack started, a reminder every 30 min while it lasts, then attack over with a summary.
+- Optional: an alert for every rejected Home Assistant password (at most one every 10 min per IP).
 
-Les cibles sont les services `notify.*` de votre installation (application mobile…), à choisir lors de la configuration.
+Targets are the `notify.*` services of your installation (mobile app…), picked during setup.
 
-## Entités
+## Entities
 
-| Entité | Rôle |
+| Entity | Purpose |
 |---|---|
-| `binary_sensor.sentinelle_attaque_en_cours` | `on` pendant une attaque (classe *safety*) |
-| `sensor.sentinelle_tentatives_24_h` | Total sur 24 h ; ses attributs alimentent la carte |
-| `sensor.sentinelle_tentatives_ha_24_h`, `…_ssh_24_h` | Détail par source |
-| `sensor.sentinelle_ip_distinctes_24_h`, `sensor.sentinelle_tentatives_7_jours` | IP différentes, total 7 jours |
-| `sensor.sentinelle_derniere_tentative` | Horodatage, IP, source, pays de la dernière tentative |
+| Attack in progress (`binary_sensor`) | `on` during an attack (*safety* device class) |
+| Attempts 24 h (`sensor`) | 24 h total; its attributes feed the card |
+| HA attempts 24 h, SSH attempts 24 h | Split by source |
+| Distinct IPs 24 h, Attempts 7 days | Different IPs, 7-day total |
+| Last attempt (`sensor`, timestamp) | Time, IP, source, country of the latest attempt |
 
-L'historique (7 jours) est conservé entre les redémarrages.
+The history (7 days) survives restarts. Counters have a state class, so they get long-term statistics.
 
 ## Installation (HACS)
 
-1. HACS → menu ⋮ → **Dépôts personnalisés** → `https://github.com/PMSSI/Integration-sentinelle`, catégorie **Intégration**.
-2. Télécharger **Sentinelle**, redémarrer Home Assistant.
-3. **Paramètres → Appareils et services → Ajouter une intégration → Sentinelle** : choisir les téléphones, le seuil et la fenêtre.
+1. HACS → ⋮ menu → **Custom repositories** → `https://github.com/PMSSI/Integration-sentinelle`, category **Integration**.
+2. Download **Sentinelle**, then restart Home Assistant.
+3. **Settings → Devices & services → Add integration → Sentinelle**: choose the phones, the threshold and the window.
 
-La surveillance SSH nécessite Home Assistant OS ou Supervised (accès au Supervisor). Sans Supervisor, seule la partie Home Assistant fonctionne.
+SSH monitoring needs Home Assistant OS or Supervised (Supervisor access). Without a Supervisor, only the Home Assistant part works.
 
-## Carte
+## Card
 
-La carte est chargée automatiquement : ajoutez **Sentinelle** depuis le sélecteur de cartes, ou en YAML :
+The card is loaded automatically: add **Sentinelle** from the card picker, or in YAML:
 
 ```yaml
 type: custom:sentinelle-card
-top: 5        # IP affichées (défaut 5)
-max_rows: 8   # dernières tentatives (défaut 8)
+top: 5        # IPs shown (default 5)
+max_rows: 8   # latest attempts (default 8)
 ```
 
-Elle affiche l'état (calme / tentatives / attaque), les compteurs, les principales IP sur 24 h et les dernières tentatives (regroupées), en thème clair comme sombre.
+It shows the status (quiet / attempts / attack), the counters, the top IPs over 24 h and the latest attempts (grouped), in light and dark themes.
+
+## Language
+
+Entity names, the setup dialog, notifications and the card follow the Home Assistant language. English and French are included.
+
+**Français** : l'interface (entités, configuration, notifications, carte) est traduite en français et suit la langue de Home Assistant.
 
 ## Tests
 
 ```bash
-python tests/test_parsing.py   # analyse des logs, sans Home Assistant
-node tests/card_smoke.js       # rendu de la carte avec un faux hass
+python tests/test_parsing.py   # log parsing, no Home Assistant needed
+node tests/card_smoke.js       # card rendering with a fake hass (FR + EN)
 ```
 
-## Licence
+## License
 
 MIT

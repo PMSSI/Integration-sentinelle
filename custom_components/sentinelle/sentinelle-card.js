@@ -1,12 +1,13 @@
 /**
- * Carte Lovelace de l'intégration Sentinelle (connexions refusées HA + SSH).
- * Chargée automatiquement par l'intégration :  type: custom:sentinelle-card
- * Options : top (IP affichées, défaut 5), max_rows (dernières tentatives, défaut 8).
+ * Lovelace card for the Sentinelle integration (rejected HA + SSH logins).
+ * Loaded automatically by the integration:  type: custom:sentinelle-card
+ * Options: top (IPs shown, default 5), max_rows (latest attempts, default 8).
  *
- * Style aligné sur les tuiles Mushroom + card_mod du tableau de bord : halo coloré
- * derrière l'icône, barre lumineuse de 4 px en bas, pastille de valeur sombre en haut à droite.
+ * Styled like Mushroom + card_mod tiles: coloured glow behind the icon,
+ * 4 px glowing bar at the bottom, dark value pill in the top-right corner.
+ * Text follows the Home Assistant language (French or English).
  */
-const SENTINELLE_CARD_VERSION = "0.1.0";
+const SENTINELLE_CARD_VERSION = "0.2.0";
 
 const RGB = {
   ok: "0, 230, 180",
@@ -16,6 +17,67 @@ const RGB = {
   ssh: "224, 64, 251",
 };
 const SRC_LABEL = { ha: "HA", ssh: "SSH" };
+
+const STRINGS = {
+  en: {
+    error: "Sentinelle: cannot render.",
+    noEntity: "Sentinelle: no entity found. Is the integration set up?",
+    attackSince: "Attack in progress since {time} · {n} attempts in {w} min",
+    calmLast: "No attack · last attempt {ago}",
+    calm: "No attempt · all quiet",
+    topIps: "Top IPs",
+    recent: "Latest attempts",
+    week: "{n} over 7 days",
+    empty: "No attempt recorded in 7 days 👌",
+    haLogins: "HA logins",
+    sshDown: "SSH unavailable",
+    alert: "Alert: {n} in {w} min",
+    kpiIps: "IPs",
+    kpiWeek: "7 days",
+    now: "just now",
+    minAgo: "{n} min ago",
+    hAgo: "{n} h ago",
+    dAgo: "{n} d ago",
+    lan: "Local network",
+    sshUser: "user \u201c{u}\u201d",
+    sshEmpty: "empty user",
+    password: "password rejected",
+    token: "invalid token · {d}",
+  },
+  fr: {
+    error: "Sentinelle : affichage impossible.",
+    noEntity: "Sentinelle : aucune entité trouvée. L'intégration est-elle configurée ?",
+    attackSince: "Attaque en cours depuis {time} · {n} tentatives en {w} min",
+    calmLast: "Aucune attaque · dernière tentative {ago}",
+    calm: "Aucune tentative · tout est calme",
+    topIps: "Principales IP",
+    recent: "Dernières tentatives",
+    week: "{n} sur 7 jours",
+    empty: "Aucune tentative enregistrée sur 7 jours 👌",
+    haLogins: "Connexions HA",
+    sshDown: "SSH indisponible",
+    alert: "Alerte : {n} en {w} min",
+    kpiIps: "IP",
+    kpiWeek: "7 jours",
+    now: "à l'instant",
+    minAgo: "il y a {n} min",
+    hAgo: "il y a {n} h",
+    dAgo: "il y a {n} j",
+    lan: "Réseau local",
+    sshUser: "utilisateur « {u} »",
+    sshEmpty: "utilisateur vide",
+    password: "mot de passe refusé",
+    token: "jeton invalide · {d}",
+  },
+};
+
+const LANG = (hass) => {
+  const l = (hass && (hass.language || (hass.locale && hass.locale.language))) || "en";
+  return String(l).toLowerCase().indexOf("fr") === 0 ? "fr" : "en";
+};
+
+// Fills {placeholders}; the result is plain text, to be passed through ESC().
+const FMT = (s, v) => s.replace(/\{(\w+)\}/g, (m, k) => (v && v[k] != null ? String(v[k]) : m));
 
 const STYLE = `
 :host{
@@ -75,31 +137,32 @@ const FLAG = (cc) => {
   return String.fromCodePoint.apply(null, cc.toUpperCase().split("").map((c) => 127397 + c.charCodeAt(0)));
 };
 
-const TIME = (iso) => {
+const TIME = (iso, lang) => {
   const d = new Date(iso);
   if (isNaN(d.getTime())) return "";
-  const hm = d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+  const locale = lang === "fr" ? "fr-FR" : undefined;
+  const hm = d.toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" });
   if (d.toDateString() === new Date().toDateString()) return hm;
-  return d.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" }) + " " + hm;
+  return d.toLocaleDateString(locale, { day: "2-digit", month: "2-digit" }) + " " + hm;
 };
 
-const AGO = (iso) => {
+const AGO = (iso, T) => {
   const s = (Date.now() - new Date(iso).getTime()) / 1000;
   if (!(s >= 0)) return "";
-  if (s < 60) return "à l'instant";
-  if (s < 3600) return "il y a " + Math.floor(s / 60) + " min";
-  if (s < 86400) return "il y a " + Math.floor(s / 3600) + " h";
-  return "il y a " + Math.floor(s / 86400) + " j";
+  if (s < 60) return T.now;
+  if (s < 3600) return FMT(T.minAgo, { n: Math.floor(s / 60) });
+  if (s < 86400) return FMT(T.hAgo, { n: Math.floor(s / 3600) });
+  return FMT(T.dAgo, { n: Math.floor(s / 86400) });
 };
 
-const PLACE = (a) => {
-  if (a.cc === "LAN") return "Réseau local";
+const PLACE = (a, T) => {
+  if (a.cc === "LAN") return T.lan;
   return [a.country, a.isp].filter((x) => x).join(" · ");
 };
 
-const DETAIL = (a) => {
-  if (a.src === "ssh") return a.user ? "utilisateur « " + a.user + " »" : "utilisateur vide";
-  return a.kind === "login" ? "mot de passe refusé" : "jeton invalide · " + (a.detail || "");
+const DETAIL = (a, T) => {
+  if (a.src === "ssh") return a.user ? FMT(T.sshUser, { u: a.user }) : T.sshEmpty;
+  return a.kind === "login" ? T.password : FMT(T.token, { d: a.detail || "" });
 };
 
 class SentinelleCard extends HTMLElement {
@@ -116,7 +179,7 @@ class SentinelleCard extends HTMLElement {
     } catch (err) {
       console.error("[sentinelle-card]", err);
       this._sig = null;
-      this._root.innerHTML = `<style>${STYLE}</style><ha-card style="--c:${RGB.warn}"><div class="empty">Sentinelle : affichage impossible.</div></ha-card>`;
+      this._root.innerHTML = `<style>${STYLE}</style><ha-card style="--c:${RGB.warn}"><div class="empty">${ESC(STRINGS[LANG(hass)].error)}</div></ha-card>`;
     }
   }
 
@@ -139,13 +202,15 @@ class SentinelleCard extends HTMLElement {
     const found = this._find();
     const S = found.summary;
     const A = found.attack;
-    // Re-rendu seulement si les entités changent (ou chaque minute, pour « il y a … »).
-    const sig = [S && S.last_updated, A && A.last_updated, Math.floor(Date.now() / 60000)].join("|");
+    const lang = LANG(this._hass);
+    const T = STRINGS[lang];
+    // Re-render only when the entities (or the language) change, or every minute for "… ago".
+    const sig = [S && S.last_updated, A && A.last_updated, lang, Math.floor(Date.now() / 60000)].join("|");
     if (sig === this._sig) return;
     this._sig = sig;
 
     if (!S) {
-      this._root.innerHTML = `<style>${STYLE}</style><ha-card style="--c:${RGB.warn}"><div class="empty">Sentinelle : aucune entité trouvée. L'intégration est-elle configurée ?</div></ha-card>`;
+      this._root.innerHTML = `<style>${STYLE}</style><ha-card style="--c:${RGB.warn}"><div class="empty">${ESC(T.noEntity)}</div></ha-card>`;
       return;
     }
     const at = S.attributes;
@@ -159,30 +224,30 @@ class SentinelleCard extends HTMLElement {
 
     let secondary;
     if (attackOn) {
-      secondary = `Attaque en cours depuis ${ESC(TIME(at.attack_since))} · ${ESC(at.count_window)} tentatives en ${ESC(at.window)} min`;
+      secondary = FMT(T.attackSince, { time: TIME(at.attack_since, lang), n: at.count_window, w: at.window });
     } else if (recent.length) {
-      secondary = `Aucune attaque · dernière tentative ${ESC(AGO(recent[0].t))}`;
+      secondary = FMT(T.calmLast, { ago: AGO(recent[0].t, T) });
     } else {
-      secondary = "Aucune tentative · tout est calme";
+      secondary = T.calm;
     }
 
     const ha = Number(at.ha) || 0;
     const ssh = Number(at.ssh) || 0;
     const share = (n) => (total ? Math.round((n / total) * 100) : 0);
     const kpi = (label, value, rgb, lvl) =>
-      `<div class="kpi" style="--k:${rgb};--l:${lvl}%"><div class="l">${label}</div><div class="v">${ESC(value)}</div></div>`;
+      `<div class="kpi" style="--k:${rgb};--l:${lvl}%"><div class="l">${ESC(label)}</div><div class="v">${ESC(value)}</div></div>`;
 
     const topHtml = top.length
-      ? `<div class="sec">Principales IP <span>24 h</span></div>` +
+      ? `<div class="sec">${ESC(T.topIps)} <span>24 h</span></div>` +
         top.map((r) => {
           const w = Math.max(6, Math.round((r.n / top[0].n) * 100));
           return `<div class="row" style="--k:${color};--w:${w}%"><div class="fill"></div>` +
             `<span class="flag">${FLAG(r.cc)}</span><span class="ip">${ESC(r.ip)}</span>` +
-            `<span class="where">${ESC(PLACE(r))}</span><span class="n">${ESC(r.n)}</span></div>`;
+            `<span class="where">${ESC(PLACE(r, T))}</span><span class="n">${ESC(r.n)}</span></div>`;
         }).join("")
       : "";
 
-    // Regroupe les tentatives consécutives identiques (sshd écrit une ligne par mot de passe).
+    // Group identical consecutive attempts (sshd writes one line per password).
     const groups = [];
     recent.forEach((a) => {
       const g = groups[groups.length - 1];
@@ -195,36 +260,36 @@ class SentinelleCard extends HTMLElement {
       }
     });
     const recentHtml = groups.length
-      ? `<div class="sec">Dernières tentatives <span>${ESC(at.week)} sur 7 jours</span></div>` +
+      ? `<div class="sec">${ESC(T.recent)} <span>${ESC(FMT(T.week, { n: at.week }))}</span></div>` +
         groups.slice(0, this._config.max_rows).map((g) => {
           const k = RGB[g.src] || RGB.warn;
-          return `<div class="row" style="--k:${k}"><span class="t">${ESC(TIME(g.t))}</span>` +
+          return `<div class="row" style="--k:${k}"><span class="t">${ESC(TIME(g.t, lang))}</span>` +
             `<span class="src">${ESC(SRC_LABEL[g.src] || g.src)}</span>` +
             `<span class="flag">${FLAG(g.cc)}</span><span class="ip">${ESC(g.ip)}</span>` +
-            `<span class="where">${ESC(DETAIL(g))}</span>` +
+            `<span class="where">${ESC(DETAIL(g, T))}</span>` +
             `${g.n > 1 ? `<span class="n">×${g.n}</span>` : ""}</div>`;
         }).join("")
-      : `<div class="empty">Aucune tentative enregistrée sur 7 jours 👌</div>`;
+      : `<div class="empty">${ESC(T.empty)}</div>`;
 
     const slugs = at.ssh_slugs || [];
     const sshOk = !at.ssh_error && slugs.length > 0;
     const foot = `<div class="foot">` +
-      `<span><i class="${at.ha_monitored ? "" : "ko"}"></i>Connexions HA</span>` +
-      `<span title="${ESC(at.ssh_error || slugs.join(", "))}"><i class="${sshOk ? "" : "ko"}"></i>SSH${sshOk ? "" : " indisponible"}</span>` +
-      `<span>Alerte : ${ESC(threshold)} en ${ESC(at.window)} min</span></div>`;
+      `<span><i class="${at.ha_monitored ? "" : "ko"}"></i>${ESC(T.haLogins)}</span>` +
+      `<span title="${ESC(at.ssh_error || slugs.join(", "))}"><i class="${sshOk ? "" : "ko"}"></i>${sshOk ? "SSH" : ESC(T.sshDown)}</span>` +
+      `<span>${ESC(FMT(T.alert, { n: threshold, w: at.window }))}</span></div>`;
 
     this._root.innerHTML = `<style>${STYLE}</style>
       <ha-card class="${attackOn ? "attack" : ""}" style="--c:${color};--lvl:${level}%">
         <div class="badge">${ESC(total)} <small>/ 24 h</small></div>
         <div class="hero">
           <div class="shape"><ha-icon icon="${attackOn ? "mdi:shield-alert" : total ? "mdi:shield-half-full" : "mdi:shield-check"}"></ha-icon></div>
-          <div><div class="primary">Sentinelle</div><div class="secondary">${secondary}</div></div>
+          <div><div class="primary">Sentinelle</div><div class="secondary">${ESC(secondary)}</div></div>
         </div>
         <div class="kpis">
           ${kpi("HA", ha, RGB.ha, share(ha))}
           ${kpi("SSH", ssh, RGB.ssh, share(ssh))}
-          ${kpi("IP", at.ips || 0, color, 0)}
-          ${kpi("7 jours", at.week || 0, color, 0)}
+          ${kpi(T.kpiIps, at.ips || 0, color, 0)}
+          ${kpi(T.kpiWeek, at.week || 0, color, 0)}
         </div>
         ${topHtml}
         ${recentHtml}
@@ -243,10 +308,10 @@ class SentinelleCard extends HTMLElement {
   static getStubConfig() { return {}; }
 }
 
-// Enregistrement IDEMPOTENT (le fichier peut être chargé deux fois : par l'intégration ET
-// via une ressource Lovelace manuelle) — sinon « already defined » casse le frontend mobile.
+// IDEMPOTENT registration (the file can be loaded twice: by the integration AND through a
+// manual Lovelace resource) — otherwise "already defined" breaks the mobile frontend.
 if (customElements.get("sentinelle-card")) {
-  console.warn(`[sentinelle-card] v${SENTINELLE_CARD_VERSION} ignorée : « sentinelle-card » est déjà défini par un autre fichier.`);
+  console.warn(`[sentinelle-card] v${SENTINELLE_CARD_VERSION} skipped: "sentinelle-card" is already defined by another file.`);
 } else {
   customElements.define("sentinelle-card", SentinelleCard);
   window.customCards = window.customCards || [];
@@ -254,7 +319,7 @@ if (customElements.get("sentinelle-card")) {
     window.customCards.push({
       type: "sentinelle-card",
       name: "Sentinelle",
-      description: "Tentatives de connexion refusées (Home Assistant + SSH) : état, principales IP, dernières tentatives.",
+      description: "Rejected logins (Home Assistant + SSH): status, top IPs, latest attempts.",
       preview: true,
     });
   }

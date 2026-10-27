@@ -1,6 +1,6 @@
-"""Tests de parsing.py (sans Home Assistant) : python tests/test_parsing.py
+"""Tests for parsing.py (no Home Assistant needed): python tests/test_parsing.py
 
-Adresses de documentation uniquement (RFC 5737 / 3849) : aucune donnée réelle.
+Documentation addresses only (RFC 5737 / 3849): no real data.
 """
 from datetime import datetime, timedelta, timezone
 import importlib.util
@@ -17,12 +17,12 @@ PARIS = timezone(timedelta(hours=1))
 
 
 def _line(ts: datetime, msg: str) -> str:
-    """Ligne au format journald x-log renvoyé par le Supervisor."""
+    """Line in the journald x-log format returned by the Supervisor."""
     return f"{ts.isoformat(sep=' ', timespec='milliseconds')} homeassistant app_core_ssh[42]: {msg}"
 
 
 def _synthetic_log(n: int = 300) -> list[str]:
-    """Journal sshd réaliste : connexions, refus (plusieurs à la même milliseconde), succès."""
+    """Realistic sshd log: connections, rejections (several within the same millisecond), successes."""
     start = datetime(2026, 1, 1, 3, 0, tzinfo=PARIS)
     lines = []
     for i in range(n):
@@ -78,10 +78,10 @@ def test_cursor():
     first, cur, gap = parsing.new_ssh_attempts(lines, None, TZ)
     assert len(first) == expected and not gap, (len(first), expected)
     assert [a["t"] for a in first] == sorted(a["t"] for a in first)
-    # Relecture identique : rien de neuf.
+    # Same lines read again: nothing new.
     again, cur2, gap2 = parsing.new_ssh_attempts(lines, cur, TZ)
     assert again == [] and cur2 == cur and not gap2, (len(again), gap2)
-    # Fenêtre glissante : les 500 dernières lignes + nouvelles lignes, dont plusieurs à la même milliseconde.
+    # Sliding window: the last 500 lines + new lines, several within the same millisecond.
     later = datetime(2099, 1, 1, tzinfo=PARIS)
     new = [
         _line(later, "Failed password for invalid user admin from 198.51.100.8 port 1 ssh2"),
@@ -90,11 +90,11 @@ def test_cursor():
     ]
     nxt, cur3, gap3 = parsing.new_ssh_attempts(lines[-500:] + new, cur, TZ)
     assert [a["user"] for a in nxt] == ["admin", "test"] and not gap3, nxt
-    # Même milliseconde relue + une ligne de plus à cette milliseconde : seule la nouvelle compte.
+    # Same millisecond read again + one more line at that millisecond: only the new one counts.
     more = new + [_line(later, "Failed password for invalid user oracle from 198.51.100.8 port 1 ssh2")]
     last, _, _ = parsing.new_ssh_attempts(more, cur3, TZ)
     assert [a["user"] for a in last] == ["oracle"], last
-    # Trou : la 1re ligne reçue est déjà postérieure au curseur.
+    # Gap: the first line received is already newer than the cursor.
     _, _, gap4 = parsing.new_ssh_attempts(more, {"ts": "2026-01-01T00:00:00.000+00:00", "seen": []}, TZ)
     assert gap4
 

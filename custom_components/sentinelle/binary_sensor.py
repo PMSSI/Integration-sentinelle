@@ -1,4 +1,4 @@
-"""Binary sensor Sentinelle : « Attaque en cours »."""
+"""Sentinelle binary sensor: "Attack in progress"."""
 from __future__ import annotations
 
 from homeassistant.components.binary_sensor import (
@@ -20,10 +20,10 @@ async def async_setup_entry(
 
 
 class SentinelleAttackBinarySensor(SentinelleEntity, BinarySensorEntity):
-    """ON (= dangereux) dès que le seuil de tentatives est atteint dans la fenêtre glissante."""
+    """ON (= unsafe) as soon as the attempt threshold is reached within the sliding window."""
 
     _attr_device_class = BinarySensorDeviceClass.SAFETY
-    _attr_name = "Attaque en cours"
+    _attr_translation_key = "attack"
 
     def __init__(self, monitor) -> None:
         super().__init__(monitor, "attack")
@@ -41,9 +41,9 @@ class SentinelleAttackBinarySensor(SentinelleEntity, BinarySensorEntity):
         data = self.monitor.data
         return {
             "sentinelle_kind": "attack",
-            "depuis": data.get("attack_since"),
-            "tentatives_fenetre": data.get("count_window"),
-            "ip_fenetre": data.get("ips_window"),
-            "fenetre_min": data.get("window"),
-            "seuil": data.get("threshold"),
+            "since": data.get("attack_since"),
+            "attempts_window": data.get("count_window"),
+            "ips_window": data.get("ips_window"),
+            "window_min": data.get("window"),
+            "threshold": data.get("threshold"),
         }

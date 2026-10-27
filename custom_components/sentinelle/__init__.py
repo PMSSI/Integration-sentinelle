@@ -1,4 +1,4 @@
-"""Intégration Sentinelle : surveille les connexions refusées (Home Assistant + SSH)."""
+"""Sentinelle integration: monitors rejected logins (Home Assistant + SSH)."""
 from __future__ import annotations
 
 import logging
@@ -17,7 +17,7 @@ CARD_URL = f"/{DOMAIN}/sentinelle-card.js"
 
 
 async def _register_card(hass: HomeAssistant) -> None:
-    """Sert la carte Lovelace et la charge automatiquement (dispo dans l'éditeur graphique)."""
+    """Serve the Lovelace card and load it automatically (available in the visual editor)."""
     if hass.data.get(f"{DOMAIN}_card"):
         return
     card = Path(__file__).parent / "sentinelle-card.js"
@@ -29,12 +29,12 @@ async def _register_card(hass: HomeAssistant) -> None:
         )
         from homeassistant.components.frontend import add_extra_js_url
 
-        # ?v= : force le navigateur à recharger la carte après une mise à jour.
+        # ?v= forces browsers (and the mobile app) to reload the card after an update.
         add_extra_js_url(hass, f"{CARD_URL}?v={VERSION}")
         hass.data[f"{DOMAIN}_card"] = True
-    except Exception as err:  # noqa: BLE001 - non bloquant : l'intégration marche sans la carte
-        _LOGGER.warning("Chargement auto de la carte impossible (%s). "
-                        "Ajoutez %s en ressource manuellement si besoin.", err, CARD_URL)
+    except Exception as err:  # noqa: BLE001 - non-blocking: the integration works without the card
+        _LOGGER.warning("Cannot auto-load the card (%s). "
+                        "Add %s as a Lovelace resource manually if needed.", err, CARD_URL)
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:

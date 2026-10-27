@@ -1,4 +1,4 @@
 __pycache__/
 *.pyc
-# extraits de vrais logs : ne jamais publier
+# real log extracts: never publish
 tests/*.log

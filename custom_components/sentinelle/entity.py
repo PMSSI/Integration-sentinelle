@@ -1,4 +1,4 @@
-"""Entité de base Sentinelle (un seul appareil « Sentinelle »)."""
+"""Sentinelle base entity (a single "Sentinelle" device)."""
 from __future__ import annotations
 
 from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
@@ -10,7 +10,7 @@ from .monitor import SentinelleMonitor
 
 
 class SentinelleEntity(Entity):
-    """Rafraîchie par le moniteur (dispatcher), jamais interrogée."""
+    """Pushed by the monitor (dispatcher), never polled."""
 
     _attr_has_entity_name = True
     _attr_should_poll = False
@@ -22,7 +22,7 @@ class SentinelleEntity(Entity):
             identifiers={(DOMAIN, monitor.entry.entry_id)},
             name="Sentinelle",
             manufacturer="Sentinelle",
-            model="Détection d'intrusion",
+            model="Intrusion monitor",
             sw_version=VERSION,
             entry_type=DeviceEntryType.SERVICE,
         )

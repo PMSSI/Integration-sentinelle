@@ -1,6 +1,6 @@
-"""Cœur de Sentinelle : collecte des connexions refusées (HA + add-ons SSH), détection, alertes.
+"""Sentinelle core: collects rejected logins (HA + SSH add-ons), detects attacks, notifies.
 
-Surveillance uniquement : rien n'est bloqué.
+Monitoring only: nothing is ever blocked.
 """
 from __future__ import annotations
 
@@ -59,6 +59,36 @@ from .parsing import iso_utc, new_ssh_attempts, parse_ha_failure
 
 _LOGGER = logging.getLogger(__name__)
 
+# Notification texts: French when Home Assistant runs in French, English otherwise.
+_TEXT = {
+    "fr": {
+        "lan": "réseau local",
+        "lan_country": "Réseau local",
+        "describe": "{n} tentatives ({sources}) depuis {ips} IP. Principale : {top}{where} ({top_n}).",
+        "start_title": "🚨 Sentinelle : attaque en cours",
+        "start": "En {window} min : {summary}",
+        "ongoing_title": "🚨 Sentinelle : attaque toujours en cours",
+        "ongoing": "Depuis {start} : {summary}",
+        "end_title": "✅ Sentinelle : attaque terminée",
+        "end": "De {start} à {end} : {summary}",
+        "login_title": "🔐 Connexion Home Assistant refusée",
+        "login": "Mot de passe refusé depuis {ip}{where}.",
+    },
+    "en": {
+        "lan": "local network",
+        "lan_country": "Local network",
+        "describe": "{n} attempts ({sources}) from {ips} IPs. Top: {top}{where} ({top_n}).",
+        "start_title": "🚨 Sentinelle: attack in progress",
+        "start": "In {window} min: {summary}",
+        "ongoing_title": "🚨 Sentinelle: attack still in progress",
+        "ongoing": "Since {start}: {summary}",
+        "end_title": "✅ Sentinelle: attack over",
+        "end": "From {start} to {end}: {summary}",
+        "login_title": "🔐 Home Assistant login rejected",
+        "login": "Password rejected from {ip}{where}.",
+    },
+}
+
 
 def _ts(attempt: dict) -> str:
     return attempt["t"]
@@ -71,7 +101,7 @@ def _flag(cc: str | None) -> str:
 
 
 class _BanLogHandler(logging.Handler):
-    """Intercepte l'avertissement « Login attempt … » écrit par le module http.ban de HA."""
+    """Catches the "Login attempt …" warning written by HA's http.ban module."""
 
     def __init__(self, hass: HomeAssistant, on_message) -> None:
         super().__init__(logging.WARNING)
@@ -81,14 +111,14 @@ class _BanLogHandler(logging.Handler):
     def emit(self, record: logging.LogRecord) -> None:
         try:
             message = record.getMessage()
-        except Exception:  # noqa: BLE001 - un handler de log ne doit jamais lever
+        except Exception:  # noqa: BLE001 - a log handler must never raise
             return
         if message.startswith("Login attempt"):
             self._hass.loop.call_soon_threadsafe(self._on_message, message)
 
 
 class SentinelleMonitor:
-    """Historique des tentatives (7 jours, persisté), détection d'attaque, notifications."""
+    """Attempt history (7 days, persisted), attack detection, notifications."""
 
     def __init__(self, hass: HomeAssistant, entry: ConfigEntry) -> None:
         self.hass = hass
@@ -96,14 +126,14 @@ class SentinelleMonitor:
         self._store: Store[dict[str, Any]] = Store(
             hass, STORAGE_VERSION, f"{DOMAIN}.{entry.entry_id}"
         )
-        self.attempts: list[dict] = []  # triées par "t" (ISO UTC)
+        self.attempts: list[dict] = []  # sorted by "t" (ISO UTC)
         self.geo: dict[str, dict] = {}
         self.ssh_cursors: dict[str, dict] = {}
         self.ssh_slugs: list[str] = []
         self.ssh_error: str | None = None
         self.ha_monitored = False
         self.data: dict[str, Any] = {}
-        self._attack_since: str | None = None  # 1re tentative de l'attaque en cours
+        self._attack_since: str | None = None  # first attempt of the ongoing attack
         self._attack_announced = False
         self._last_attack_notify: datetime | None = None
         self._last_login_notify: dict[str, datetime] = {}
@@ -121,7 +151,14 @@ class SentinelleMonitor:
     def window(self) -> int:
         return int(self.entry.options.get(CONF_WINDOW, DEFAULT_WINDOW))
 
-    # ------------------------------------------------------------------ cycle de vie
+    @property
+    def _lang(self) -> str:
+        return "fr" if (self.hass.config.language or "").lower().startswith("fr") else "en"
+
+    def _t(self, key: str, **kwargs: Any) -> str:
+        return _TEXT[self._lang][key].format(**kwargs)
+
+    # ------------------------------------------------------------------ lifecycle
 
     async def async_start(self) -> None:
         stored = await self._store.async_load() or {}
@@ -138,8 +175,8 @@ class SentinelleMonitor:
         self.ha_monitored = ban_logger.isEnabledFor(logging.WARNING)
         if not self.ha_monitored:
             _LOGGER.warning(
-                "Le niveau de log de %s est au-dessus de WARNING : "
-                "les connexions HA refusées ne seront pas détectées",
+                "The log level of %s is above WARNING: "
+                "rejected HA logins will not be detected",
                 BAN_LOGGER,
             )
 
@@ -167,12 +204,12 @@ class SentinelleMonitor:
 
     @callback
     def _spawn(self, coro: Coroutine, name: str) -> None:
-        # Tâche rattachée à l'entrée : annulée automatiquement au déchargement.
+        # Task bound to the entry: cancelled automatically on unload.
         self.entry.async_create_background_task(self.hass, coro, f"{DOMAIN}_{name}")
 
     @callback
     def _to_store(self) -> dict[str, Any]:
-        # Copies : le Store sérialise hors de la boucle, pendant que de nouvelles tentatives arrivent.
+        # Copies: the Store serialises off the event loop while new attempts keep arriving.
         ips = {a["ip"] for a in self.attempts}
         return {
             "attempts": list(self.attempts),
@@ -180,7 +217,7 @@ class SentinelleMonitor:
             "ssh_cursors": dict(self.ssh_cursors),
         }
 
-    # ------------------------------------------------------------------ collecte
+    # ------------------------------------------------------------------ collection
 
     @callback
     def _on_ha_log(self, message: str) -> None:
@@ -200,14 +237,14 @@ class SentinelleMonitor:
     async def _async_tick(self, _now: datetime | None = None) -> None:
         await self._async_poll_ssh()
         self._prune()
-        self._queue_geo(set())  # relance les géolocalisations restées en échec
+        self._queue_geo(set())  # retry geolocations that failed earlier
         self._evaluate(notify=True)
         self._schedule_update()
 
     async def _async_poll_ssh(self) -> None:
         token = os.environ.get("SUPERVISOR_TOKEN")
         if not token:
-            self.ssh_error = "Supervisor absent : surveillance SSH impossible"
+            self.ssh_error = "No Supervisor: SSH monitoring unavailable"
             return
         base = f"http://{os.environ.get('SUPERVISOR', 'supervisor')}"
         headers = {"Authorization": f"Bearer {token}"}
@@ -222,7 +259,7 @@ class SentinelleMonitor:
                 await self._async_poll_addon(session, base, headers, slug)
         except (aiohttp.ClientError, TimeoutError, KeyError, TypeError, ValueError) as err:
             self.ssh_error = f"{type(err).__name__}: {err}"[:200]
-            _LOGGER.debug("Lecture des logs SSH impossible : %s", self.ssh_error)
+            _LOGGER.debug("Cannot read SSH logs: %s", self.ssh_error)
         else:
             self.ssh_error = None
 
@@ -241,7 +278,7 @@ class SentinelleMonitor:
         if new_cursor != cursor:
             self.ssh_cursors[slug] = new_cursor
             self._store.async_delay_save(self._to_store, SAVE_DELAY)
-        # Premier passage = reprise de l'historique : pas d'alerte pour le passé.
+        # First poll = backfilling history: no alert for past attempts.
         self._add(attempts, notify=cursor is not None)
 
     @staticmethod
@@ -286,7 +323,7 @@ class SentinelleMonitor:
         cutoff = iso_utc(dt_util.utcnow() - delta)
         return self.attempts[bisect.bisect_left(self.attempts, cutoff, key=_ts) :]
 
-    # ------------------------------------------------------------------ géolocalisation
+    # ------------------------------------------------------------------ geolocation
 
     @callback
     def _queue_geo(self, ips: set[str]) -> None:
@@ -298,7 +335,7 @@ class SentinelleMonitor:
             except ValueError:
                 continue
             if not addr.is_global:
-                self.geo[ip] = {"cc": "LAN", "country": "Réseau local"}
+                self.geo[ip] = {"cc": "LAN", "country": self._t("lan_country")}
             elif self.entry.options.get(CONF_GEOIP, True):
                 self._geo_pending.add(ip)
         if self._geo_pending and (self._geo_task is None or self._geo_task.done()):
@@ -312,12 +349,12 @@ class SentinelleMonitor:
             batch = sorted(self._geo_pending)[:GEOIP_BATCH]
             try:
                 async with asyncio.timeout(15):
-                    resp = await session.post(GEOIP_URL, json=batch)
+                    resp = await session.post(GEOIP_URL.format(lang=self._lang), json=batch)
                     resp.raise_for_status()
                     results = await resp.json(content_type=None)
             except (aiohttp.ClientError, TimeoutError, ValueError) as err:
-                _LOGGER.debug("Géolocalisation indisponible : %s", err)
-                return  # nouvel essai au prochain passage
+                _LOGGER.debug("Geolocation unavailable: %s", err)
+                return  # retried on the next poll
             for res in results if isinstance(results, list) else []:
                 if not isinstance(res, dict) or res.get("query") not in self._geo_pending:
                     continue
@@ -347,11 +384,11 @@ class SentinelleMonitor:
     def _where(self, ip: str) -> str:
         geo = self.geo.get(ip) or {}
         if geo.get("cc") == "LAN":
-            return "réseau local"
+            return self._t("lan")
         place = ", ".join(p for p in (geo.get("country"), geo.get("city")) if p)
         return f"{_flag(geo.get('cc'))} {place}".strip()
 
-    # ------------------------------------------------------------------ détection / alertes
+    # ------------------------------------------------------------------ detection / alerts
 
     @callback
     def _evaluate(self, notify: bool) -> None:
@@ -383,9 +420,14 @@ class SentinelleMonitor:
         sources = ", ".join(f"{SOURCE_LABELS.get(s, s)} {n}" for s, n in by_src.most_common())
         top_ip, top_n = by_ip.most_common(1)[0]
         where = self._where(top_ip)
-        return (
-            f"{len(attempts)} tentatives ({sources}) depuis {len(by_ip)} IP. "
-            f"Principale : {top_ip}{' ' + where if where else ''} ({top_n})."
+        return self._t(
+            "describe",
+            n=len(attempts),
+            sources=sources,
+            ips=len(by_ip),
+            top=top_ip,
+            where=f" {where}" if where else "",
+            top_n=top_n,
         )
 
     async def _async_notify_attack(self, kind: str, since: str) -> None:
@@ -395,24 +437,21 @@ class SentinelleMonitor:
         await self._async_wait_geo(Counter(a["ip"] for a in attempts).most_common(1)[0][0])
         start = dt_util.as_local(dt_util.parse_datetime(since)).strftime("%H:%M")
         if kind == "start":
-            title = "🚨 Sentinelle : attaque en cours"
             recent = self._since(timedelta(minutes=self.window)) or attempts
-            message = f"En {self.window} min : {self._describe(recent)}"
+            message = self._t("start", window=self.window, summary=self._describe(recent))
         elif kind == "ongoing":
-            title = "🚨 Sentinelle : attaque toujours en cours"
-            message = f"Depuis {start} : {self._describe(attempts)}"
+            message = self._t("ongoing", start=start, summary=self._describe(attempts))
         else:
             end = dt_util.as_local(dt_util.parse_datetime(attempts[-1]["t"])).strftime("%H:%M")
-            title = "✅ Sentinelle : attaque terminée"
-            message = f"De {start} à {end} : {self._describe(attempts)}"
-        await self._async_notify(title, message, f"{DOMAIN}_attack")
+            message = self._t("end", start=start, end=end, summary=self._describe(attempts))
+        await self._async_notify(self._t(f"{kind}_title"), message, f"{DOMAIN}_attack")
 
     async def _async_notify_login(self, attempt: dict) -> None:
         await self._async_wait_geo(attempt["ip"])
         where = self._where(attempt["ip"])
         await self._async_notify(
-            "🔐 Connexion Home Assistant refusée",
-            f"Mot de passe refusé depuis {attempt['ip']}{' (' + where + ')' if where else ''}.",
+            self._t("login_title"),
+            self._t("login", ip=attempt["ip"], where=f" ({where})" if where else ""),
             f"{DOMAIN}_login_{attempt['ip']}",
         )
 
@@ -436,9 +475,9 @@ class SentinelleMonitor:
                     blocking=True,
                 )
             except HomeAssistantError as err:
-                _LOGGER.warning("Notification via notify.%s impossible : %s", target, err)
+                _LOGGER.warning("Cannot notify via notify.%s: %s", target, err)
 
-    # ------------------------------------------------------------------ publication
+    # ------------------------------------------------------------------ publishing
 
     @callback
     def _schedule_update(self) -> None:

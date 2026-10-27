@@ -1,4 +1,4 @@
-"""Capteurs Sentinelle : compteurs de tentatives et dernière tentative."""
+"""Sentinelle sensors: attempt counters and last attempt."""
 from __future__ import annotations
 
 from collections.abc import Callable
@@ -26,36 +26,33 @@ class SentinelleSensorDescription(SensorEntityDescription):
     value_fn: Callable[[dict], Any]
 
 
+# Names and units ("attempts" / "tentatives") come from the translations (translation_key).
 COUNTERS = (
     SentinelleSensorDescription(
         key="attempts_ha_24h",
-        name="Tentatives HA 24 h",
+        translation_key="attempts_ha_24h",
         icon="mdi:home-lock",
-        native_unit_of_measurement="tentatives",
         state_class=SensorStateClass.MEASUREMENT,
         value_fn=lambda d: d.get("count_ha_24h"),
     ),
     SentinelleSensorDescription(
         key="attempts_ssh_24h",
-        name="Tentatives SSH 24 h",
+        translation_key="attempts_ssh_24h",
         icon="mdi:console-network",
-        native_unit_of_measurement="tentatives",
         state_class=SensorStateClass.MEASUREMENT,
         value_fn=lambda d: d.get("count_ssh_24h"),
     ),
     SentinelleSensorDescription(
         key="ips_24h",
-        name="IP distinctes 24 h",
+        translation_key="ips_24h",
         icon="mdi:ip-network",
-        native_unit_of_measurement="IP",
         state_class=SensorStateClass.MEASUREMENT,
         value_fn=lambda d: d.get("ips_24h"),
     ),
     SentinelleSensorDescription(
         key="attempts_7d",
-        name="Tentatives 7 jours",
+        translation_key="attempts_7d",
         icon="mdi:calendar-week",
-        native_unit_of_measurement="tentatives",
         state_class=SensorStateClass.MEASUREMENT,
         value_fn=lambda d: d.get("count_7d"),
     ),
@@ -63,9 +60,8 @@ COUNTERS = (
 
 SUMMARY = SentinelleSensorDescription(
     key="attempts_24h",
-    name="Tentatives 24 h",
+    translation_key="attempts_24h",
     icon="mdi:shield-search",
-    native_unit_of_measurement="tentatives",
     state_class=SensorStateClass.MEASUREMENT,
     value_fn=lambda d: d.get("count_24h"),
 )
@@ -97,7 +93,7 @@ class SentinelleCounterSensor(SentinelleEntity, SensorEntity):
 
 
 class SentinelleSummarySensor(SentinelleCounterSensor):
-    """Total 24 h ; porte aussi tout ce qu'affiche la carte (attributs non enregistrés)."""
+    """24 h total; also carries everything the card displays (unrecorded attributes)."""
 
     _unrecorded_attributes = frozenset(
         {"recent", "top_ips", "ssh_slugs", "ssh_error", "ha_monitored", "window", "threshold"}
@@ -127,7 +123,7 @@ class SentinelleSummarySensor(SentinelleCounterSensor):
 
 class SentinelleLastAttemptSensor(SentinelleEntity, SensorEntity):
     _attr_device_class = SensorDeviceClass.TIMESTAMP
-    _attr_name = "Dernière tentative"
+    _attr_translation_key = "last_attempt"
     _attr_icon = "mdi:clock-alert-outline"
 
     def __init__(self, monitor) -> None:
@@ -144,7 +140,7 @@ class SentinelleLastAttemptSensor(SentinelleEntity, SensorEntity):
         return {
             "ip": last.get("ip"),
             "source": last.get("src"),
-            "utilisateur": last.get("user"),
-            "pays": last.get("country"),
-            "fai": last.get("isp"),
+            "user": last.get("user"),
+            "country": last.get("country"),
+            "isp": last.get("isp"),
         }

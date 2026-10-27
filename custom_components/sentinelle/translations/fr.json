@@ -13,7 +13,10 @@
         }
       }
     },
-    "abort": { "already_configured": "Sentinelle est déjà configurée.", "single_instance_allowed": "Sentinelle est déjà configurée." }
+    "abort": {
+      "already_configured": "Sentinelle est déjà configurée.",
+      "single_instance_allowed": "Sentinelle est déjà configurée."
+    }
   },
   "options": {
     "step": {
@@ -25,6 +28,72 @@
           "window_minutes": "Fenêtre de détection",
           "notify_ha_login": "Prévenir à chaque mot de passe HA refusé",
           "geoip": "Localiser les IP (pays, FAI) via ip-api.com"
+        }
+      }
+    }
+  },
+  "entity": {
+    "binary_sensor": {
+      "attack": {
+        "name": "Attaque en cours",
+        "state_attributes": {
+          "since": {
+            "name": "Depuis"
+          },
+          "attempts_window": {
+            "name": "Tentatives dans la fenêtre"
+          },
+          "ips_window": {
+            "name": "IP dans la fenêtre"
+          },
+          "window_min": {
+            "name": "Fenêtre (min)"
+          },
+          "threshold": {
+            "name": "Seuil"
+          }
+        }
+      }
+    },
+    "sensor": {
+      "attempts_24h": {
+        "name": "Tentatives 24 h",
+        "unit_of_measurement": "tentatives"
+      },
+      "attempts_ha_24h": {
+        "name": "Tentatives HA 24 h",
+        "unit_of_measurement": "tentatives"
+      },
+      "attempts_ssh_24h": {
+        "name": "Tentatives SSH 24 h",
+        "unit_of_measurement": "tentatives"
+      },
+      "ips_24h": {
+        "name": "IP distinctes 24 h",
+        "unit_of_measurement": "IP"
+      },
+      "attempts_7d": {
+        "name": "Tentatives 7 jours",
+        "unit_of_measurement": "tentatives"
+      },
+      "last_attempt": {
+        "name": "Dernière tentative",
+        "state_attributes": {
+          "ip": {
+            "name": "IP"
+          },
+          "source": {
+            "name": "Source"
+          },
+          "user": {
+            "name": "Utilisateur"
+          },
+          "country": {
+            "name": "Pays"
+          },
+          "isp": {
+            "name": "FAI"
+          }
         }
       }
     }

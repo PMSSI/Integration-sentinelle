@@ -1,4 +1,4 @@
-"""Config flow Sentinelle : une seule instance, réglages identiques à la création et en options."""
+"""Sentinelle config flow: single instance, same settings at creation and in the options."""
 from __future__ import annotations
 
 from typing import Any
@@ -33,7 +33,7 @@ from .const import (
     DOMAIN,
 )
 
-# Services notify qui ne visent pas un appareil précis.
+# notify services that do not target a specific device.
 _GENERIC_NOTIFY = {"notify", "send_message", "persistent_notification"}
 
 

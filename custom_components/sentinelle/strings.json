@@ -13,7 +13,10 @@
         }
       }
     },
-    "abort": { "already_configured": "Sentinelle is already configured.", "single_instance_allowed": "Sentinelle is already configured." }
+    "abort": {
+      "already_configured": "Sentinelle is already configured.",
+      "single_instance_allowed": "Sentinelle is already configured."
+    }
   },
   "options": {
     "step": {
@@ -25,6 +28,72 @@
           "window_minutes": "Detection window",
           "notify_ha_login": "Notify on every rejected HA password",
           "geoip": "Locate IPs (country, ISP) with ip-api.com"
+        }
+      }
+    }
+  },
+  "entity": {
+    "binary_sensor": {
+      "attack": {
+        "name": "Attack in progress",
+        "state_attributes": {
+          "since": {
+            "name": "Since"
+          },
+          "attempts_window": {
+            "name": "Attempts in window"
+          },
+          "ips_window": {
+            "name": "IPs in window"
+          },
+          "window_min": {
+            "name": "Window (min)"
+          },
+          "threshold": {
+            "name": "Threshold"
+          }
+        }
+      }
+    },
+    "sensor": {
+      "attempts_24h": {
+        "name": "Attempts 24 h",
+        "unit_of_measurement": "attempts"
+      },
+      "attempts_ha_24h": {
+        "name": "HA attempts 24 h",
+        "unit_of_measurement": "attempts"
+      },
+      "attempts_ssh_24h": {
+        "name": "SSH attempts 24 h",
+        "unit_of_measurement": "attempts"
+      },
+      "ips_24h": {
+        "name": "Distinct IPs 24 h",
+        "unit_of_measurement": "IPs"
+      },
+      "attempts_7d": {
+        "name": "Attempts 7 days",
+        "unit_of_measurement": "attempts"
+      },
+      "last_attempt": {
+        "name": "Last attempt",
+        "state_attributes": {
+          "ip": {
+            "name": "IP"
+          },
+          "source": {
+            "name": "Source"
+          },
+          "user": {
+            "name": "User"
+          },
+          "country": {
+            "name": "Country"
+          },
+          "isp": {
+            "name": "ISP"
+          }
         }
       }
     }
