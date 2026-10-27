@@ -1,0 +1,32 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Sentinelle",
+        "description": "Monitors rejected logins to Home Assistant and SSH add-ons. Nothing is blocked: you are only notified.",
+        "data": {
+          "notify_targets": "Phones to notify",
+          "threshold": "Attack threshold (attempts)",
+          "window_minutes": "Detection window",
+          "notify_ha_login": "Notify on every rejected HA password",
+          "geoip": "Locate IPs (country, ISP) with ip-api.com"
+        }
+      }
+    },
+    "abort": { "already_configured": "Sentinelle is already configured.", "single_instance_allowed": "Sentinelle is already configured." }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Sentinelle",
+        "data": {
+          "notify_targets": "Phones to notify",
+          "threshold": "Attack threshold (attempts)",
+          "window_minutes": "Detection window",
+          "notify_ha_login": "Notify on every rejected HA password",
+          "geoip": "Locate IPs (country, ISP) with ip-api.com"
+        }
+      }
+    }
+  }
+}

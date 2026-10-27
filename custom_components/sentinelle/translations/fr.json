@@ -1,0 +1,32 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Sentinelle",
+        "description": "Surveille les connexions refusées à Home Assistant et aux add-ons SSH. Rien n'est bloqué : vous êtes seulement prévenu.",
+        "data": {
+          "notify_targets": "Téléphones à prévenir",
+          "threshold": "Seuil d'attaque (tentatives)",
+          "window_minutes": "Fenêtre de détection",
+          "notify_ha_login": "Prévenir à chaque mot de passe HA refusé",
+          "geoip": "Localiser les IP (pays, FAI) via ip-api.com"
+        }
+      }
+    },
+    "abort": { "already_configured": "Sentinelle est déjà configurée.", "single_instance_allowed": "Sentinelle est déjà configurée." }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Sentinelle",
+        "data": {
+          "notify_targets": "Téléphones à prévenir",
+          "threshold": "Seuil d'attaque (tentatives)",
+          "window_minutes": "Fenêtre de détection",
+          "notify_ha_login": "Prévenir à chaque mot de passe HA refusé",
+          "geoip": "Localiser les IP (pays, FAI) via ip-api.com"
+        }
+      }
+    }
+  }
+}

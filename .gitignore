@@ -1,0 +1,4 @@
+__pycache__/
+*.pyc
+# extraits de vrais logs : ne jamais publier
+tests/*.log
