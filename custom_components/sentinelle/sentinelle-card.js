@@ -7,7 +7,7 @@
  * 4 px glowing bar at the bottom, dark value pill in the top-right corner.
  * Text follows the Home Assistant language (French or English).
  */
-const SENTINELLE_CARD_VERSION = "0.2.0";
+const SENTINELLE_CARD_VERSION = "0.2.1";
 
 const RGB = {
   ok: "0, 230, 180",

@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 DOMAIN = "sentinelle"
-VERSION = "0.2.0"
+VERSION = "0.2.1"
 
 CONF_NOTIFY = "notify_targets"
 CONF_THRESHOLD = "threshold"
